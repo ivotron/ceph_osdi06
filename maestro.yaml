@@ -1,14 +1,14 @@
 name: ceph_osdi06
 
 ships:
-  node1: {ip: &n1ip 192.168.140.101}
+  node1: {ip: &n1ip 192.168.140.132}
   node2: {ip: &n2ip 192.168.140.107}
   node3: {ip: &n3ip 192.168.140.108}
   node4: {ip: &n4ip 192.168.140.118}
-  node5: {ip: &n5ip 192.168.140.128}
-  node6: {ip: &n6ip 192.168.140.132}
+  node5: {ip: &n5ip 192.168.140.147}
+  node6: {ip: &n6ip 192.168.140.128}
   node7: {ip: &n7ip 192.168.140.144}
-  node8: {ip: &n8ip 192.168.140.147}
+  node8: {ip: &n8ip 192.168.140.101}
 
 ship_defaults:
   docker_port: 2375
@@ -52,46 +52,49 @@ service_variables:
 
 services:
   ceph-mon:
-    image: scottlaird/ceph-mon
+    image: ivotron/ceph-mon:0.87.1
     instances:
-      ceph-mon-0:
-        ship: node7
+      ceph-mon-1:
+        ship: node8
         env:
-          MON_IP: *n1ip
+          MON_IP: *n8ip
           MON_NAME: mymon
         volumes:
           /etc/ceph: *cephconf
         net: host
   ceph-osd:
-    image: scottlaird/ceph-osd
+    image: ivotron/ceph-osd:0.87.1
     requires: [ceph-mon]
+    env:
+      JOURNAL: /var/lib/ceph_journal/journal
     instances:
-      ceph-osd-0:
-        ship: node2
+      ceph-osd-1:
+        ship: node1
         env:
           OSD_ID: 0
-          HOSTNAME: *n2ip
-#JOURNAL: /var/lib/ceph/osd/journal_dir/journal
+          HOSTNAME: *n1ip
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data
+          /var/lib/ceph_journal: *journal
         net: host
-#/var/lib/ceph/osd/journal_dir: *journal
-      ceph-osd-1:
-        ship: node3
+      ceph-osd-2:
+        ship: node2
         env:
           OSD_ID: 1
+          HOSTNAME: *n2ip
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data
+          /var/lib/ceph_journal: *journal
+        net: host
+      ceph-osd-3:
+        ship: node3
+        env:
+          OSD_ID: 2
           HOSTNAME: *n3ip
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data
-        net: host
-      ceph-osd-2:
-        ship: node4
-        env:
-          OSD_ID: 2
-          HOSTNAME: *n4ip
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data
+          /var/lib/ceph_journal: *journal
         net: host
