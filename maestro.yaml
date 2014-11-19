@@ -1,14 +1,14 @@
 name: ceph_osdi06
 
 ships:
-  node1: {ip: &n1ip 192.168.140.132}
-  node2: {ip: &n2ip 192.168.140.107}
-  node3: {ip: &n3ip 192.168.140.108}
-  node4: {ip: &n4ip 192.168.140.118}
-  node5: {ip: &n5ip 192.168.140.147}
-  node6: {ip: &n6ip 192.168.140.128}
-  node7: {ip: &n7ip 192.168.140.144}
-  node8: {ip: &n8ip 192.168.140.101}
+  node1: {ip: &n1ip 192.168.141.132}
+  node2: {ip: &n2ip 192.168.141.107}
+  node3: {ip: &n3ip 192.168.141.108}
+  node4: {ip: &n4ip 192.168.141.147}
+  node5: {ip: &n5ip 192.168.141.128}
+  node6: {ip: &n6ip 192.168.141.144} # 3T HDDs
+  node7: {ip: &n7ip 192.168.141.118} # NoSSD
+  node8: {ip: &n8ip 192.168.141.101} # NoSSD
 
 ship_defaults:
   docker_port: 2375
@@ -32,29 +32,57 @@ ship_defaults:
       filesystem: 'ext4'
       device: '/dev/sdb1'
       partition: 'auto'
-    
+
+    - label:  None
+      filesystem: 'ext4'
+      device: '/dev/sdc1'
+      partition: 'auto'
+
+    - label:  None
+      filesystem: 'ext4'
+      device: '/dev/sdd1'
+      partition: 'auto'
+
     - label: None
       filesystem: 'xfs'
       device: '/dev/sde1'
       partition: 'auto'
 
+    - label: None
+      filesystem: 'xfs'
+      device: '/dev/sde2'
+      partition: 'auto'
+
+    - label: None
+      filesystem: 'xfs'
+      device: '/dev/sde3'
+      partition: 'auto'
+
   mounts:
-    - [ sdb1, /mnt/hdd, "auto" ]
-    - [ sde1, /mnt/ssd, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sdb1, /mnt/hdd1, "auto" ]
+    - [ sdc1, /mnt/hdd2, "auto" ]
+    - [ sdd1, /mnt/hdd3, "auto" ]
+    - [ sde1, /mnt/ssd1, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sde2, /mnt/ssd2, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sde3, /mnt/ssd3, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
 
   mount_default_fields: [ None, None, "auto", "defaults,nobootwait", "0", "2" ]
   # }
 
 service_variables:
   ceph-conf-path: &cephconf /user/ivo/cephconf
-  osd-data-path: &data /mnt/hdd/ivo/ceph/
-  journal-path: &journal /mnt/ssd/ivo/ceph/
+  hdd1: &data1 /mnt/hdd1/ceph/
+  hdd2: &data2 /mnt/hdd2/ceph/
+  hdd3: &data3 /mnt/hdd3/ceph/
+  journal1: &journal1 /mnt/ssd1/ceph/
+  journal2: &journal2 /mnt/ssd2/ceph/
+  journal3: &journal3 /mnt/ssd3/ceph/
 
 services:
   ceph-mon:
     image: ivotron/ceph-mon:0.87.1
     instances:
-      ceph-mon-1:
+      ceph-mon:
         ship: node8
         env:
           MON_IP: *n8ip
@@ -68,33 +96,111 @@ services:
     env:
       JOURNAL: /var/lib/ceph_journal/journal
     instances:
-      ceph-osd-1:
+      ceph-osd-01:
         ship: node1
         env:
           OSD_ID: 0
-          HOSTNAME: *n1ip
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data
-          /var/lib/ceph_journal: *journal
+          /var/lib/ceph: *data1
+          /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-2:
+      ceph-osd-02:
         ship: node2
         env:
           OSD_ID: 1
-          HOSTNAME: *n2ip
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data
-          /var/lib/ceph_journal: *journal
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
         net: host
-      ceph-osd-3:
+      ceph-osd-03:
         ship: node3
         env:
           OSD_ID: 2
-          HOSTNAME: *n3ip
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data
-          /var/lib/ceph_journal: *journal
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+      ceph-osd-04:
+        ship: node4
+        env:
+          OSD_ID: 3
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data1
+          /var/lib/ceph_journal: *journal1
+        net: host
+      ceph-osd-05:
+        ship: node1
+        env:
+          OSD_ID: 4
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
+        net: host
+      ceph-osd-06:
+        ship: node2
+        env:
+          OSD_ID: 5
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+      ceph-osd-07:
+        ship: node3
+        env:
+          OSD_ID: 6
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data1
+          /var/lib/ceph_journal: *journal1
+        net: host
+      ceph-osd-08:
+        ship: node4
+        env:
+          OSD_ID: 7
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
+        net: host
+      ceph-osd-09:
+        ship: node1
+        env:
+          OSD_ID: 8
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+      ceph-osd-10:
+        ship: node2
+        env:
+          OSD_ID: 9
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data1
+          /var/lib/ceph_journal: *journal1
+        net: host
+      ceph-osd-11:
+        ship: node3
+        env:
+          OSD_ID: 10
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
+        net: host
+      ceph-osd-12:
+        ship: node4
+        env:
+          OSD_ID: 11
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
         net: host
