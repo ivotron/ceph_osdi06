@@ -1,14 +1,12 @@
 name: ceph_osdi06
 
 ships:
-  node1: {ip: &n1ip 192.168.141.132}
-  node2: {ip: &n2ip 192.168.141.107}
-  node3: {ip: &n3ip 192.168.141.108}
-  node4: {ip: &n4ip 192.168.141.147}
-  node5: {ip: &n5ip 192.168.141.128}
-  node6: {ip: &n6ip 192.168.141.144} # 3T HDDs
-  node7: {ip: &n7ip 192.168.141.118} # NoSSD
-  node8: {ip: &n8ip 192.168.141.101} # NoSSD
+  node0: {ip: &n0ip 192.168.141.101} # NoSSD
+  node1: {ip: 192.168.141.107}
+  node2: {ip: 192.168.141.108}
+  node3: {ip: 192.168.141.132}
+  node4: {ip: 192.168.141.147}
+  node5: {ip: 192.168.141.144}
 
 ship_defaults:
   docker_port: 2375
@@ -74,18 +72,18 @@ service_variables:
   hdd1: &data1 /mnt/hdd1/ceph/
   hdd2: &data2 /mnt/hdd2/ceph/
   hdd3: &data3 /mnt/hdd3/ceph/
-  journal1: &journal1 /mnt/ssd1/ceph/
-  journal2: &journal2 /mnt/ssd2/ceph/
-  journal3: &journal3 /mnt/ssd3/ceph/
+  ssd1: &journal1 /mnt/ssd1/ceph/
+  ssd2: &journal2 /mnt/ssd2/ceph/
+  ssd3: &journal3 /mnt/ssd3/ceph/
 
 services:
   ceph-mon:
     image: ivotron/ceph-mon:0.87.1
     instances:
       ceph-mon:
-        ship: node8
+        ship: node0
         env:
-          MON_IP: *n8ip
+          MON_IP: *n0ip
           MON_NAME: mymon
         volumes:
           /etc/ceph: *cephconf
@@ -96,7 +94,7 @@ services:
     env:
       JOURNAL: /var/lib/ceph_journal/journal
     instances:
-      ceph-osd-01:
+      ceph-osd-1:
         ship: node1
         env:
           OSD_ID: 0
@@ -105,7 +103,7 @@ services:
           /var/lib/ceph: *data1
           /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-02:
+      ceph-osd-2:
         ship: node2
         env:
           OSD_ID: 1
@@ -114,7 +112,7 @@ services:
           /var/lib/ceph: *data1
           /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-03:
+      ceph-osd-3:
         ship: node3
         env:
           OSD_ID: 2
@@ -123,7 +121,7 @@ services:
           /var/lib/ceph: *data1
           /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-04:
+      ceph-osd-4:
         ship: node4
         env:
           OSD_ID: 3
@@ -132,17 +130,17 @@ services:
           /var/lib/ceph: *data1
           /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-05:
-        ship: node1
+      ceph-osd-5:
+        ship: node5
         env:
           OSD_ID: 4
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
+          /var/lib/ceph: *data1
+          /var/lib/ceph_journal: *journal1
         net: host
-      ceph-osd-06:
-        ship: node2
+      ceph-osd-6:
+        ship: node1
         env:
           OSD_ID: 5
         volumes:
@@ -150,8 +148,8 @@ services:
           /var/lib/ceph: *data2
           /var/lib/ceph_journal: *journal2
         net: host
-      ceph-osd-07:
-        ship: node3
+      ceph-osd-7:
+        ship: node2
         env:
           OSD_ID: 6
         volumes:
@@ -159,8 +157,8 @@ services:
           /var/lib/ceph: *data2
           /var/lib/ceph_journal: *journal2
         net: host
-      ceph-osd-08:
-        ship: node4
+      ceph-osd-8:
+        ship: node3
         env:
           OSD_ID: 7
         volumes:
@@ -168,26 +166,26 @@ services:
           /var/lib/ceph: *data2
           /var/lib/ceph_journal: *journal2
         net: host
-      ceph-osd-09:
-        ship: node1
+      ceph-osd-9:
+        ship: node4
         env:
           OSD_ID: 8
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
         net: host
       ceph-osd-10:
-        ship: node2
+        ship: node5
         env:
           OSD_ID: 9
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
         net: host
       ceph-osd-11:
-        ship: node3
+        ship: node1
         env:
           OSD_ID: 10
         volumes:
@@ -196,7 +194,7 @@ services:
           /var/lib/ceph_journal: *journal3
         net: host
       ceph-osd-12:
-        ship: node4
+        ship: node2
         env:
           OSD_ID: 11
         volumes:
@@ -204,3 +202,68 @@ services:
           /var/lib/ceph: *data3
           /var/lib/ceph_journal: *journal3
         net: host
+      ceph-osd-13:
+        ship: node3
+        env:
+          OSD_ID: 12
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+      ceph-osd-14:
+        ship: node4
+        env:
+          OSD_ID: 13
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+      ceph-osd-15:
+        ship: node5
+        env:
+          OSD_ID: 14
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+          /var/lib/ceph_journal: *journal3
+        net: host
+  ceph-osd-cleanup:
+    image: stackbrew/ubuntu:trusty
+    instances:
+      ceph-osd-cleanup-1:
+        ship: node1
+        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
+      ceph-osd-cleanup-2:
+        ship: node2
+        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
+      ceph-osd-cleanup-3:
+        ship: node3
+        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
+      ceph-osd-cleanup-4:
+        ship: node4
+        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
+      ceph-osd-cleanup-5:
+        ship: node5
+        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
