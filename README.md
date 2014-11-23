@@ -28,8 +28,9 @@ Run rados bench
 
 Tracked via submodules:
 
-  * maestro-ng
+  * docker-maestro
   * docker-ceph
+  * docker-notebook
 
 Not tracked:
 
