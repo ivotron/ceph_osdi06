@@ -121,10 +121,18 @@ if [ $docker_exists = "not found" ]; then
   exit 1
 fi
 
-m="docker run -t -v `pwd`:/data ivotron/maestro"
+m="docker run -v `pwd`:/data ivotron/maestro"
+
+# check if maestro runs OK
+$m status
+
+if [ $? != "0" ] ; then
+  echo "ERROR: can't execute maestro container"
+  exit 1
+fi
 
 # check num of MON services
-num_mon_services=`$m status ceph-mon | grep ceph-mon | wc -l`
+num_mon_services=`$m status ceph-mon | grep down | wc -l`
 
 if [ $? != "0" ] ; then
   echo "ERROR: can't execute maestro container"
@@ -137,7 +145,7 @@ if [ $num_mon_services != "$NUM_MON" ] ; then
 fi
 
 # check num of OSD services
-num_osd_services=`$m status ceph-osd | grep ceph-osd | wc -l`
+num_osd_services=`$m status ceph-osd | grep down | wc -l`
 
 if [ "$num_osd_services" -lt "$MAX_NUM_OSD" ] ; then
   echo "ERROR: Can't execute, need at least $MAX_NUM_OSD services"
@@ -204,8 +212,8 @@ while [ "$num_osds" -le "$MAX_NUM_OSD" ] ; do
 
   # execute benchmark
   docker run \
-      -e SIZE="4096 4194304" \
-      -e SEC=$SECS -e N=$MAX_REPLICAS -e PGS=$PGS -e REPS=$REPS \
+      -e NUM_OSD=$num_osds -e SEC=$SECS \
+      -e N=$MAX_REPLICAS -e REPS=$REPS \
       -v $RESULTS_PATH:/data \
       -v $CEPHCONF:/etc/ceph \
       ivotron/radosbench
