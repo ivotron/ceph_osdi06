@@ -76,7 +76,7 @@ Also, CVS repository might still exist in NFS.
 ## 2014-11-22
 
 Finished with high-level orchestration script. We're now in the 
-process of reproducing Figs 6-9 of the paper.
+process of reproducing Figs 5-8 of the paper.
 
 ## 2014-11-20
 
