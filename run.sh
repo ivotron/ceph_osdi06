@@ -116,7 +116,7 @@ if [ $docker_exists = "not found" ]; then
   exit 1
 fi
 
-m="docker run -v `pwd`:/data ivotron/maestro"
+m="docker run -v `pwd`:/data ivotron/maestro:0.2.3"
 
 # check if maestro runs OK
 $m status
@@ -178,7 +178,7 @@ if [ "$mons_up" -ne 1 ] ; then
   exit 1
 fi
 
-docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base /usr/bin/ceph osd pool delete rbd rbd --yes-i-really-really-mean-it
+docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph osd pool delete rbd rbd --yes-i-really-really-mean-it
 
 if [ $? != "0" ] ; then
   echo "ERROR: while deleting rbd pool"
@@ -187,7 +187,7 @@ fi
 
 # start osds
 for ((osd_id=1; osd_id<=num_osds; osd_id++)) ; do
-  docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base /usr/bin/ceph osd create
+  docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph osd create
 
   if [ $? != "0" ] ; then
     echo "ERROR: can't create OSD $osd_id"
@@ -225,7 +225,7 @@ for ((n=1; n<=N; n++)); do
       -e N=$n \
       -v $RESULTS_PATH:/data \
       -v $CEPHCONF:/etc/ceph \
-      ivotron/radosbench
+      ivotron/radosbench:0.2
   else
     docker run \
       -e RESULTS_PATH="/data/$EXP" \
@@ -234,7 +234,7 @@ for ((n=1; n<=N; n++)); do
       -e N=$n \
       -v $RESULTS_PATH:/data \
       -v $CEPHCONF:/etc/ceph \
-      ivotron/radosbench
+      ivotron/radosbench:0.2
   fi
 done
 
@@ -278,7 +278,7 @@ while [ "$num_osds" -le "$MAX_NUM_OSD" ] ; do
     exit 1
   fi
 
-  docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base /usr/bin/ceph osd pool delete rbd rbd --yes-i-really-really-mean-it
+  docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph osd pool delete rbd rbd --yes-i-really-really-mean-it
 
   if [ $? != "0" ] ; then
     echo "ERROR: while deleting rbd pool"
@@ -287,7 +287,7 @@ while [ "$num_osds" -le "$MAX_NUM_OSD" ] ; do
 
   # start osds
   for ((osd_id=1; osd_id<=num_osds; osd_id++)) ; do
-    docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base /usr/bin/ceph osd create
+    docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph osd create
 
     if [ $? != "0" ] ; then
       echo "ERROR: can't create OSD $osd_id"
@@ -318,7 +318,7 @@ while [ "$num_osds" -le "$MAX_NUM_OSD" ] ; do
       -e SIZE="4194304" \
       -v $RESULTS_PATH:/data \
       -v $CEPHCONF:/etc/ceph \
-      ivotron/radosbench
+      ivotron/radosbench:0.2
 
   # stop cluster
   $m stop
@@ -396,7 +396,7 @@ if [ -n "$GENERATE_FIGURES" ] ; then
   docker run \
       -v $RESULTS_PATH:/results \
       -v $PWD:/script \
-      ivotron/gnuplot -e "maxosd=$MAX_NUM_OSD" \
+      ivotron/gnuplot:4.6.4 -e "maxosd=$MAX_NUM_OSD" \
                       -e "folder='/results'" \
                       -e "experiment=\'$EXP\'" \
                       /script/plot.gp
