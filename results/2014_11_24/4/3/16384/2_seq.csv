@@ -1,0 +1,12 @@
+   sec Cur ops   started  finished  avg MB/s  cur MB/s  last lat   avg lat
+     0       0         0         0         0         0         -         0
+     1      16      4767      4751   74.2149   74.2344  0.0012050.00335646
+     2      16     10270     10254   80.0926   85.9844   0.002430.00311686
+ Total time run:        2.369473
+Total reads made:     12089
+Read size:            16384
+Bandwidth (MB/sec):    79.718 
+
+Average Latency:       0.00313258
+Max latency:           0.04476
+Min latency:           0.00113
