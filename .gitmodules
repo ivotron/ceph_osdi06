@@ -4,9 +4,6 @@
 [submodule "docker-maestro"]
 	path = docker-maestro
 	url = git@github.com:ivotron/docker-maestro.git
-[submodule "docker-notebook"]
-	path = docker-notebook
-	url = git@github.com:ivotron/docker-notebook.git
 [submodule "docker-gnuplot"]
 	path = docker-gnuplot
 	url = git@github.com:ivotron/docker-gnuplot.git
