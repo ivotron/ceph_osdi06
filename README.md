@@ -23,7 +23,8 @@ Tracked via submodules:
 
   * docker-maestro
   * docker-ceph
-  * docker-notebook
+  * docker-radosbench
+  * docker-gnuplot
 
 Not tracked:
 
@@ -45,18 +46,32 @@ Not tracked:
 
 # High-level lab log
 
+## 2014-11-27
+
+Obtained figures and results from a small 4-node/8-osd cluster in 
+order to compare trends against OSDI paper. Figures 5,6 are similar. 
+Figures 7,8 are distinct
+
+## 2014-11-26
+
+  * Took 2 days (11/24-11/26) to finish the scripts that generate 
+    graphs from radosbench output.
+
+## 2014-11-25
+
+  * Found CVS folder
+  * Created separate docker-radosbench project to maintain the 
+    radosbench Dockerfile and evolve it independently from docker-ceph
+
 ## 2014-11-24
 
-  * Carlos provided specific dates of MDS experiments:
+Carlos provided specific dates of MDS experiments:
 
-    > I found the chat of the LLNL ASC experiment. It was on February 
-    28, 2006. Sage got the ASC cluster from 3:30pm to 5pm the next day 
-    (3/1/06). Sage worked mostly on MDS experiments.
+> I found the chat of the LLNL ASC experiment. It was on February 
+28, 2006. Sage got the ASC cluster from 3:30pm to 5pm the next day 
+(3/1/06). Sage worked mostly on MDS experiments.
 
-    Also, CVS repository might still exist in NFS.
-
-  * Created scripts to generate graphs from radosbench output. Need to 
-    consider [this bug][bug]
+Also, CVS repository might still exist in NFS.
 
 ## 2014-11-22
 
