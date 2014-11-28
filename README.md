@@ -32,7 +32,7 @@ Not tracked:
   * Ephemeral storage
   * HDDs on sdb-sdd
   * SSD on sde
-  * Ubuntu 12.04.3 (docker host)
+  * Ubuntu 12.04.3 (docker hosts)
   * Linux 3.8.0-44-generic x86_64
   * docker:
       * Client version: 1.3.1
