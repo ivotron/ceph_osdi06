@@ -2,11 +2,10 @@ name: ceph_osdi06
 
 ships:
   node0: {ip: &n0ip 192.168.141.101} # NoSSD
-  node1: {ip: 192.168.141.107}
-  node2: {ip: 192.168.141.108}
-  node3: {ip: 192.168.141.132}
-  node4: {ip: 192.168.141.147}
-  node5: {ip: 192.168.141.144}
+  node1: {ip: 192.168.141.132}
+  node2: {ip: 192.168.141.147}
+  node3: {ip: 192.168.141.107}
+  node4: {ip: 192.168.141.108}
 
 ship_defaults:
   docker_port: 2375
@@ -27,17 +26,17 @@ ship_defaults:
 
   fs_setup:
     - label:  None
-      filesystem: 'ext4'
+      filesystem: 'xfs'
       device: '/dev/sdb1'
       partition: 'auto'
 
     - label:  None
-      filesystem: 'ext4'
+      filesystem: 'xfs'
       device: '/dev/sdc1'
       partition: 'auto'
 
     - label:  None
-      filesystem: 'ext4'
+      filesystem: 'xfs'
       device: '/dev/sdd1'
       partition: 'auto'
 
@@ -118,8 +117,8 @@ services:
           OSD_ID: 2
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data1
-          /var/lib/ceph_journal: *journal1
+          /var/lib/ceph: *data2
+          /var/lib/ceph_journal: *journal2
         net: host
       ceph-osd-4:
         ship: node4
@@ -127,142 +126,58 @@ services:
           OSD_ID: 3
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data1
-          /var/lib/ceph_journal: *journal1
-        net: host
-      ceph-osd-5:
-        ship: node5
-        env:
-          OSD_ID: 4
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data1
-          /var/lib/ceph_journal: *journal1
-        net: host
-      ceph-osd-6:
-        ship: node1
-        env:
-          OSD_ID: 5
-        volumes:
-          /etc/ceph: *cephconf
           /var/lib/ceph: *data2
           /var/lib/ceph_journal: *journal2
         net: host
-      ceph-osd-7:
-        ship: node2
-        env:
-          OSD_ID: 6
+  ceph-radosbench:
+    image: ivotron/ceph-base
+    env:
+      OBJ_SIZE: *objsize
+      BENCH_TYPE: *benchtype
+    instances:
+      ceph-radosbench-1:
+        ship: node0
+        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node0
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
-        net: host
-      ceph-osd-8:
+          /data: *resultsfolder
+      ceph-radosbench-2:
         ship: node3
-        env:
-          OSD_ID: 7
+        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node3
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
-        net: host
-      ceph-osd-9:
+          /data: *resultsfolder
+      ceph-radosbench-3:
         ship: node4
-        env:
-          OSD_ID: 8
+        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node4
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
-        net: host
-      ceph-osd-10:
-        ship: node5
-        env:
-          OSD_ID: 9
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
-        net: host
-      ceph-osd-11:
+          /data: *resultsfolder
+      ceph-radosbench-3:
         ship: node1
-        env:
-          OSD_ID: 10
+        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node1
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
-        net: host
-      ceph-osd-12:
+          /data: *resultsfolder
+      ceph-radosbench-4:
         ship: node2
-        env:
-          OSD_ID: 11
+        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node2
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
-        net: host
-      ceph-osd-13:
-        ship: node3
-        env:
-          OSD_ID: 12
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
-        net: host
-      ceph-osd-14:
-        ship: node4
-        env:
-          OSD_ID: 13
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
-        net: host
-      ceph-osd-15:
-        ship: node5
-        env:
-          OSD_ID: 14
-        volumes:
-          /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
-          /var/lib/ceph_journal: *journal3
-        net: host
+          /data: *resultsfolder
   ceph-osd-cleanup:
     image: stackbrew/ubuntu:trusty
     instances:
       ceph-osd-cleanup-1:
         ship: node1
-        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
         volumes:
           /data1: *data1
           /data2: *data2
           /data3: *data3
       ceph-osd-cleanup-2:
         ship: node2
-        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
-        volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
-      ceph-osd-cleanup-3:
-        ship: node3
-        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
-        volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
-      ceph-osd-cleanup-4:
-        ship: node4
-        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
-        volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
-      ceph-osd-cleanup-5:
-        ship: node5
-        command: /bin/sh -c "rm -r /data1/* /data2/* /data3/*"
+        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
         volumes:
           /data1: *data1
           /data2: *data2
