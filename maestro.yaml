@@ -1,25 +1,29 @@
+_globals_defaults:
+  V1: &cephconf /user/ivo/cephconf
+  V2: &resultsfolder /user/ivo/projects/ceph_osdi06/results/
+  V3: &secs 60
+  V4: &benchtype write
+  V5: &size 4194304
+  V6: &threads 16
+
 name: ceph_osdi06
 
 ships:
-  node0: {ip: &n0ip 192.168.141.101} # NoSSD
-  node1: {ip: 192.168.141.132}
+  node0: {ip: &n0ip 192.168.141.101}
+  node1: {ip: 192.168.141.107}
   node2: {ip: 192.168.141.147}
-  node3: {ip: 192.168.141.107}
-  node4: {ip: 192.168.141.108}
+  node3: {ip: 192.168.141.118}
+  node4: {ip: 192.168.141.132}
 
 ship_defaults:
   docker_port: 2375
 
-  # this is currently ignored, but we're putting it here for later reference and
-  # to exemplify how we would like this to be given. This is taken from
-  # cloud-config's cloud-init syntax for disk formatting and configuration modules
-  # {
+# this is currently ignored, but we're putting it here for later reference and
+# to exemplify how we would like this to be given. This is taken from
+# cloud-config's cloud-init syntax for disk formatting and configuration modules
+# {
   disk_setup:
     /dev/sdb1:
-      table_type: 'mbr'
-      layout: True
-      overwrite: True
-    /dev/sde1:
       table_type: 'mbr'
       layout: True
       overwrite: True
@@ -40,40 +44,18 @@ ship_defaults:
       device: '/dev/sdd1'
       partition: 'auto'
 
-    - label: None
-      filesystem: 'xfs'
-      device: '/dev/sde1'
-      partition: 'auto'
-
-    - label: None
-      filesystem: 'xfs'
-      device: '/dev/sde2'
-      partition: 'auto'
-
-    - label: None
-      filesystem: 'xfs'
-      device: '/dev/sde3'
-      partition: 'auto'
-
   mounts:
-    - [ sdb1, /mnt/hdd1, "auto" ]
-    - [ sdc1, /mnt/hdd2, "auto" ]
-    - [ sdd1, /mnt/hdd3, "auto" ]
-    - [ sde1, /mnt/ssd1, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
-    - [ sde2, /mnt/ssd2, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
-    - [ sde3, /mnt/ssd3, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sdb1, /mnt/hdd1, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sdc1, /mnt/hdd2, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
+    - [ sdd1, /mnt/hdd3, "auto", "rw,noexec,nodev,noatime,nodiratime,nobarrier", "0", "0" ]
 
   mount_default_fields: [ None, None, "auto", "defaults,nobootwait", "0", "2" ]
-  # }
+# }
 
 service_variables:
-  ceph-conf-path: &cephconf /user/ivo/cephconf
   hdd1: &data1 /mnt/hdd1/ceph/
   hdd2: &data2 /mnt/hdd2/ceph/
   hdd3: &data3 /mnt/hdd3/ceph/
-  ssd1: &journal1 /mnt/ssd1/ceph/
-  ssd2: &journal2 /mnt/ssd2/ceph/
-  ssd3: &journal3 /mnt/ssd3/ceph/
 
 services:
   ceph-mon:
@@ -90,8 +72,6 @@ services:
   ceph-osd:
     image: ivotron/ceph-osd:0.87.1
     requires: [ceph-mon]
-    env:
-      JOURNAL: /var/lib/ceph_journal/journal
     instances:
       ceph-osd-1:
         ship: node1
@@ -100,7 +80,6 @@ services:
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data1
-          /var/lib/ceph_journal: *journal1
         net: host
       ceph-osd-2:
         ship: node2
@@ -109,7 +88,6 @@ services:
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data1
-          /var/lib/ceph_journal: *journal1
         net: host
       ceph-osd-3:
         ship: node3
@@ -117,51 +95,70 @@ services:
           OSD_ID: 2
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
+          /var/lib/ceph: *data1
         net: host
       ceph-osd-4:
-        ship: node4
+        ship: node1
         env:
           OSD_ID: 3
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data2
-          /var/lib/ceph_journal: *journal2
+        net: host
+      ceph-osd-5:
+        ship: node2
+        env:
+          OSD_ID: 4
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+        net: host
+      ceph-osd-6:
+        ship: node3
+        env:
+          OSD_ID: 5
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+        net: host
+      ceph-osd-7:
+        ship: node1
+        env:
+          OSD_ID: 6
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-8:
+        ship: node2
+        env:
+          OSD_ID: 7
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-9:
+        ship: node3
+        env:
+          OSD_ID: 8
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
         net: host
   ceph-radosbench:
-    image: ivotron/ceph-base
+    image: ivotron/radosbench:0.2
+    requires: [ceph-osd]
     env:
-      OBJ_SIZE: *objsize
-      BENCH_TYPE: *benchtype
+      TYPE: *benchtype
+      SECS: *secs
+      THREADS: *threads
+      SIZE: *size
+      POOL: test
     instances:
       ceph-radosbench-1:
-        ship: node0
-        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node0
-        volumes:
-          /etc/ceph: *cephconf
-          /data: *resultsfolder
-      ceph-radosbench-2:
-        ship: node3
-        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node3
-        volumes:
-          /etc/ceph: *cephconf
-          /data: *resultsfolder
-      ceph-radosbench-3:
         ship: node4
-        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node4
-        volumes:
-          /etc/ceph: *cephconf
-          /data: *resultsfolder
-      ceph-radosbench-3:
-        ship: node1
-        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node1
-        volumes:
-          /etc/ceph: *cephconf
-          /data: *resultsfolder
-      ceph-radosbench-4:
-        ship: node2
-        command: /usr/bin/rados -b ${OBJSIZE} -p test bench 15 ${BENCH_TYPE} -t 2 --no-cleanup > /data/node2
+        env:
+          OUTFILE: /data/*benchtype
         volumes:
           /etc/ceph: *cephconf
           /data: *resultsfolder
@@ -177,6 +174,13 @@ services:
           /data3: *data3
       ceph-osd-cleanup-2:
         ship: node2
+        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
+        volumes:
+          /data1: *data1
+          /data2: *data2
+          /data3: *data3
+      ceph-osd-cleanup-3:
+        ship: node3
         command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
         volumes:
           /data1: *data1

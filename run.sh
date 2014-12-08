@@ -18,9 +18,10 @@ usage()
   echo " -f : Generate figures ([y|n] default: y)."
   echo " -d : Execute using default values ([y|n] default: n)."
   echo " -c : ceph configuration path (Default: '$PWD/cephconf/')."
+  echo " -b : Space-separated list of object size in bytes ([y|n] default: 4MB)."
   echo " -o : path to folder containing experimental results (Default: '$PWD/results/')."
-  echo " -s : Set the runtime in seconds (default: 60)."
-  echo " -m : Maximum number of OSDs (default: 3)."
+  echo " -s : Set the runtime in seconds (default: 15)."
+  echo " -m : Maximum number of OSDs (default: 2)."
   echo " -n : Experiment name (default: time-based [e.g. $EXP])."
   echo " -h : Show this help & exit"
   echo ""
@@ -31,6 +32,17 @@ ceph_health()
 {
   echo -n "Waiting for pool operation to finish..."
   while [ "$($c health)" != "HEALTH_OK" ] ; do
+    sleep 2
+    echo -n "."
+  done
+  echo ""
+}
+
+wait_for_radosbench ()
+{
+  echo -n "Waiting for radosbench operation to finish..."
+
+  while [ "$($m status ceph-radosbench | grep 'running for' | wc -l)" -ne 0 ] ; do
     sleep 2
     echo -n "."
   done
@@ -67,6 +79,9 @@ do
   s)
     SECS="${OPTARG}"
     ;;
+  b)
+    SIZE="${OPTARG}"
+    ;;
   h)
     usage
     ;;
@@ -100,10 +115,10 @@ if [ ! -n "$SECS" ]; then
   SECS=15
 fi
 if [ ! -n "${MAX_NUM_OSD}" ]; then
-  MAX_NUM_OSD=3
-elif [ "$MAX_NUM_OSD" -lt 3 ] ; then
-  echo "ERROR: MAX_NUM_OSD has to be at least 3"
-  exit 1
+  MAX_NUM_OSD=2
+fi
+if [ ! -n "${SIZE}" ]; then
+  MAX_NUM_OSD=4194304
 fi
 if [ ! -n "$PER_ROUND_OSD_INCREMENT" ]; then
   PER_ROUND_OSD_INCREMENT=1
@@ -112,9 +127,6 @@ fi
 ###################
 # docker/maestro basics
 ###################
-
-m="docker run -v `pwd`:/data ivotron/maestro:0.2.3"
-c="docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph"
 
 # check if we can execute docker
 docker_exists=`type -P docker &>/dev/null && echo "found" || echo "not found"`
@@ -125,12 +137,29 @@ if [ $docker_exists = "not found" ]; then
 fi
 
 # check if maestro runs OK
+m="docker run -v `pwd`:/data ivotron/maestro:0.2.3"
+
 $m status
 
 if [ $? != "0" ] ; then
   echo "ERROR: can't execute maestro container"
   exit 1
 fi
+
+###############
+# Run experiment
+###############
+
+# Executes write benchmarks from n=1 to MAX_NUM_OSD with replication factor
+# 1 and 4m objects. This corresponds to figure 8.
+#
+# When n=MAX_NUM_OSD, object size ranges from 4k to 4m, which corresponds to the
+# red line in figures 5,6. Read (seq) benchmarks are also executed, which are
+# used for figure 7.
+
+if [ $RUN_EXP = "y" ] ; then
+
+c="docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph"
 
 # check num of MON services
 num_mon_services=`$m status ceph-mon | grep down | wc -l`
@@ -161,21 +190,6 @@ if [ $hosts_down != "0" ] ; then
   exit 1
 fi
 
-# Run experiment
-#
-# Executes write benchmarks from n=1 to MAX_NUM_OSD with replication factor
-# 1 and 4m objects. This corresponds to figure 8.
-#
-# When n=MAX_NUM_OSD object size ranges from 4k to 4m, which corresponds to the
-# red line in figures 5,6. Read (seq) benchmarks are also executed, which are
-# used for figure 7.
-
-if [ $RUN_EXP = "y" ] ; then
-
-num_osds=1
-
-while [ "$num_osds" -le "$MAX_NUM_OSD" ] ; do
-
 # start monitor
 $m start ceph-mon
 
@@ -198,99 +212,80 @@ if [ $? != "0" ] ; then
   exit 1
 fi
 
-# start osds
-for ((osd_id=1; osd_id<=num_osds; osd_id++)) ; do
+curr_osd=1
+
+while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
+
+  $c osd pool delete test test --yes-i-really-really-mean-it
+
+  # add osd
   $c osd create
 
   if [ $? != "0" ] ; then
-    echo "ERROR: can't create OSD $osd_id"
+    echo "ERROR: can't create OSD $curr_osd"
     exit 1
   fi
 
-  $m start ceph-osd-$osd_id
+  $m start ceph-osd-$curr_osd
 
   if [ $? != "0" ] ; then
-    echo "ERROR: can't initialize osd service $osd_id"
+    echo "ERROR: can't initialize osd service $curr_osd"
     exit 1
   fi
 
-  osd_up=`$m status ceph-osd-$osd_id | grep 'running for' | wc -l`
+  osd_up=`$m status ceph-osd-$curr_osd | grep 'running for' | wc -l`
 
   if [ $osd_up != "1" ] ; then
-    echo "ERROR: OSD service ceph-osd-$osd_id seems to have stopped"
-    exit 1
-  fi
-done
-
-# create pool
-$c osd pool create test
-ceph_health
-
-$c osd pool set test size 1
-
-if [ $num_osds -eq $MAX_NUM_OSD ] ; then
-  SIZE="4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304"
-else
-  SIZE="4194304"
-fi
-
-
-for size in $SIZE; do
-
-  f="$RESULTS_PATH/$EXP/$num_osds/$size/write/"
-  mkdir -p $f
-
-  cat maestro.yaml > maestro_with_vars.yaml
-  echo "_globals:" >> maestro_with_vars.yaml
-  echo "  V1: &objsize $size" >> maestro_with_vars.yaml
-  echo "  V2: &testname $EXP" >> maestro_with_vars.yaml
-  echo "  V3: &resultsfolder $f" >> maestro_with_vars.yaml
-  echo "  V4: &sec $SECS" >> maestro_with_vars.yaml
-  echo "  V5: &benchtype write" >> maestro_with_vars.yaml
-
-  $m -f /data/maestro_with_vars.yaml start ceph-radosbench
-
-  if [ $? != "0" ] ; then
-    echo "ERROR: can't initialize radosbench services"
+    echo "ERROR: OSD service ceph-osd-$curr_osd seems to have stopped"
     exit 1
   fi
 
-  bench_up=`$m status ceph-radosbench | grep 'running for' | wc -l`
-
-  if [ $bench_up -eq 0 ] ; then
-    echo "ERROR: bench service seems to have stopped"
-    exit 1
+  # create pool (set PGs to 128 * OSD)
+  if [ "$curr_osd" -eq 1 ] ; then
+    $c osd pool create test 128 128
+  elif [ "$curr_osd" -eq 2 ] ; then
+    $c osd pool create test 256 256
+  elif [ "$curr_osd" -eq 3 ] ; then
+    $c osd pool create test 384 384
+  elif [ "$curr_osd" -eq 4 ] ; then
+    $c osd pool create test 512 512
+  elif [ "$curr_osd" -eq 5 ] ; then
+    $c osd pool create test 640 640
+  elif [ "$curr_osd" -eq 6 ] ; then
+    $c osd pool create test 768 768
+  else
+    $c osd pool create test 4096 4096
   fi
 
-  if [ "$num_osds" -eq $MAX_NUM_OSD ] ; then
-    f="$RESULTS_PATH/$EXP/$num_osds/$size/seq/"
+  # set replication factor to 1
+  $c osd pool set test size 1
+
+  # wait for it
+  ceph_health
+
+  # when we reach the max num of OSDs, we execute on distinct sizes
+  if [ $curr_osd -eq $MAX_NUM_OSD ] ; then
+    SIZE="4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304"
+  fi
+
+  for size in $SIZE; do
+
+    f="$RESULTS_PATH/$EXP/$curr_osd/$size/write/"
     mkdir -p $f
 
-    cat maestro.yaml > maestro_with_vars.yaml
-    echo "_globals:" >> maestro_with_vars.yaml
-    echo "  V1: &objsize $size" >> maestro_with_vars.yaml
-    echo "  V2: &testname $EXP" >> maestro_with_vars.yaml
-    echo "  V3: &resultsfolder $f" >> maestro_with_vars.yaml
-    echo "  V4: &sec $SECS" >> maestro_with_vars.yaml
-    echo "  V5: &benchtype seq" >> maestro_with_vars.yaml
-
-    $m -f /data/maestro_with_vars.yaml start ceph-radosbench
+    $m start ceph-radosbench
 
     if [ $? != "0" ] ; then
       echo "ERROR: can't initialize radosbench services"
       exit 1
     fi
 
-    bench_up=`$m status ceph-radosbench | grep 'running for' | wc -l`
+    wait_for_radosbench
+  done
 
-    if [ $bench_up -eq 0 ] ; then
-      echo "ERROR: bench service seems to have stopped"
-      exit 1
-    fi
+  curr_osd=$(($curr_osd + $PER_ROUND_OSD_INCREMENT))
 
-    fi
-done
-done
+done # while
 
 # stop cluster
 $m stop
@@ -303,15 +298,10 @@ if [ $? != "0" ] ; then
   exit 1
 fi
 
-sleep 10
+fi # RUN_EXP
 
-fi
-
-if [ -n "$GENERATE_FIGURES" ] ; then
+if [ "$GENERATE_FIGURES" = "y" ] ; then
   # generates CSV files that summarize radosbench output (one CSV per figure)
-  #
-  # expects to have results stored in the following folder structure:
-  #   results/experiment_name/osd_count/objsize_type.csv
 
   if [ ! -n "$RESULTS_PATH" ]; then
     echo "ERROR: RESULTS_PATH must be defined"
@@ -330,27 +320,23 @@ if [ -n "$GENERATE_FIGURES" ] ; then
   expath=$RESULTS_PATH/$EXP
 
   # create files
-  touch $throughput # figure 5
-  touch $latency    # figure 6
-  touch $rw         # figure 7
-  touch $scale      # figure 8
+  echo "" > $throughput # figure 5
+  echo "" > $latency    # figure 6
+  echo "" > $scale      # figure 8
 
   # populate them
   for osd in `ls $expath` ; do
   for size in `ls $expath/$osd` ; do
-  for bench in `ls $expath/$osd/$size/*` ; do
-  for client in `ls $expath/$osd/$size/$bench/*` ; do
+  for bench in `ls $expath/$osd/$size` ; do
+  for client in `ls $expath/$osd/$size/$bench` ; do
     f="$expath/$osd/$size/$bench/$client"
 
     if [ $bench = "write" ] ; then
       tp=`grep 'Bandwidth (MB/sec):' $f | sed 's/Bandwidth (MB\/sec): *//'`
       lt=`grep 'Average Latency:' $f | sed 's/Average Latency: *//'`
-      echo "$size, $client, $tp" >> $throughput
-      echo "$size, $client, $lt" >> $latency
-      echo "$osd, $size, $client, $tp" >> $scale
-    elif
-      r=`grep 'Bandwidth (MB/sec):' $f | sed 's/Bandwidth (MB\/sec): *//'`
-      echo "$size, $client, $r" >> $rw
+      echo "$size, $tp" >> $throughput
+      echo "$size, $lt" >> $latency
+      echo "$size, $osd, $tp" >> $scale
     fi
   done
   done
@@ -363,7 +349,7 @@ if [ -n "$GENERATE_FIGURES" ] ; then
       -v $PWD:/script \
       ivotron/gnuplot:4.6.4 -e "maxosd=$MAX_NUM_OSD" \
                       -e "folder='/results'" \
-                      -e "experiment=\'$EXP\'" \
+                      -e "experiment='$EXP'" \
                       /script/plot.gp
 fi
 
