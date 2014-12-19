@@ -1,19 +1,21 @@
 _globals_defaults:
-  V1: &cephconf /user/ivo/cephconf
-  V2: &resultsfolder /user/ivo/projects/ceph_osdi06/results/
-  V3: &secs 60
-  V4: &benchtype write
-  V5: &size 4194304
-  V6: &threads 16
+  V1: &cephconf {{ env.CEPHCONF }}
+  V2: &resultsfolder {{ env.RESULTS_FOLDER }}
+  V3: &secs {{ env.SECS }}
+  V4: &benchtype {{ env.EXP_TYPE }}
+  V5: &size {{ env.SIZE }}
+  V6: &threads {{ env.THREADS }}
 
 name: ceph_osdi06
 
 ships:
   node0: {ip: &n0ip 192.168.141.101}
   node1: {ip: 192.168.141.107}
-  node2: {ip: 192.168.141.147}
-  node3: {ip: 192.168.141.118}
-  node4: {ip: 192.168.141.132}
+  node2: {ip: 192.168.141.132}
+  node3: {ip: 192.168.141.108}
+  node4: {ip: 192.168.141.147}
+  node5: {ip: 192.168.141.118}
+  node6: {ip: 192.168.141.129}
 
 ship_defaults:
   docker_port: 2375
@@ -75,6 +77,9 @@ services:
     instances:
       ceph-osd-1:
         ship: node1
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
         env:
           OSD_ID: 0
         volumes:
@@ -83,6 +88,9 @@ services:
         net: host
       ceph-osd-2:
         ship: node2
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
         env:
           OSD_ID: 1
         volumes:
@@ -91,6 +99,9 @@ services:
         net: host
       ceph-osd-3:
         ship: node3
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
         env:
           OSD_ID: 2
         volumes:
@@ -98,23 +109,32 @@ services:
           /var/lib/ceph: *data1
         net: host
       ceph-osd-4:
-        ship: node1
+        ship: node4
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
         env:
           OSD_ID: 3
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
+          /var/lib/ceph: *data1
         net: host
       ceph-osd-5:
-        ship: node2
+        ship: node5
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
         env:
           OSD_ID: 4
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data2
+          /var/lib/ceph: *data1
         net: host
       ceph-osd-6:
-        ship: node3
+        ship: node1
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
         env:
           OSD_ID: 5
         volumes:
@@ -122,25 +142,100 @@ services:
           /var/lib/ceph: *data2
         net: host
       ceph-osd-7:
-        ship: node1
+        ship: node2
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
         env:
           OSD_ID: 6
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
+          /var/lib/ceph: *data2
         net: host
       ceph-osd-8:
-        ship: node2
+        ship: node3
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
         env:
           OSD_ID: 7
         volumes:
           /etc/ceph: *cephconf
-          /var/lib/ceph: *data3
+          /var/lib/ceph: *data2
         net: host
       ceph-osd-9:
-        ship: node3
+        ship: node4
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
         env:
           OSD_ID: 8
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+        net: host
+      ceph-osd-10:
+        ship: node5
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        env:
+          OSD_ID: 9
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data2
+        net: host
+      ceph-osd-11:
+        ship: node1
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        env:
+          OSD_ID: 10
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-12:
+        ship: node2
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        env:
+          OSD_ID: 11
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-13:
+        ship: node3
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        env:
+          OSD_ID: 12
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-14:
+        ship: node4
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        env:
+          OSD_ID: 13
+        volumes:
+          /etc/ceph: *cephconf
+          /var/lib/ceph: *data3
+        net: host
+      ceph-osd-15:
+        ship: node5
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        env:
+          OSD_ID: 14
         volumes:
           /etc/ceph: *cephconf
           /var/lib/ceph: *data3
@@ -156,33 +251,213 @@ services:
       POOL: test
     instances:
       ceph-radosbench-1:
-        ship: node4
+        ship: node6
         env:
-          OUTFILE: /data/*benchtype
+          OUTFILE: /var/lib/ceph/out
         volumes:
           /etc/ceph: *cephconf
-          /data: *resultsfolder
+          /var/lib/ceph: *resultsfolder
   ceph-osd-cleanup:
     image: stackbrew/ubuntu:trusty
+    requires: [ceph-osd]
     instances:
       ceph-osd-cleanup-1:
         ship: node1
-        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
+        command: /bin/sh -c "rm -fr /mnt/*"
         volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
+          /mnt: *data1
       ceph-osd-cleanup-2:
         ship: node2
-        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
+        command: /bin/sh -c "rm -fr /mnt/*"
         volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
+          /mnt: *data1
       ceph-osd-cleanup-3:
         ship: node3
-        command: /bin/sh -c "rm -fr /data1/* /data2/* /data3/*"
+        command: /bin/sh -c "rm -fr /mnt/*"
         volumes:
-          /data1: *data1
-          /data2: *data2
-          /data3: *data3
+          /mnt: *data1
+      ceph-osd-cleanup-4:
+        ship: node4
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data1
+      ceph-osd-cleanup-5:
+        ship: node5
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data1
+      ceph-osd-cleanup-6:
+        ship: node1
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data2
+      ceph-osd-cleanup-7:
+        ship: node2
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data2
+      ceph-osd-cleanup-8:
+        ship: node3
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data2
+      ceph-osd-cleanup-9:
+        ship: node4
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data2
+      ceph-osd-cleanup-10:
+        ship: node5
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data2
+      ceph-osd-cleanup-11:
+        ship: node1
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data3
+      ceph-osd-cleanup-12:
+        ship: node2
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data3
+      ceph-osd-cleanup-13:
+        ship: node3
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data3
+      ceph-osd-cleanup-14:
+        ship: node4
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data3
+      ceph-osd-cleanup-15:
+        ship: node5
+        command: /bin/sh -c "rm -fr /mnt/*"
+        volumes:
+          /mnt: *data3
+  throttle-check:
+    image: stackbrew/ubuntu:trusty
+    instances:
+      throttle-check-1:
+        ship: node1
+        env:
+          SIZE: {{ env.SIZE }}
+        command: /bin/sh -c "echo $SIZE"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
+        volumes:
+          /mnt: *data1
+      throttle-check-2:
+        ship: node1
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        volumes:
+          /mnt: *data2
+      throttle-check-3:
+        ship: node1
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        volumes:
+          /mnt: *data3
+      throttle-check-4:
+        ship: node2
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
+        volumes:
+          /mnt: *data1
+      throttle-check-5:
+        ship: node2
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        volumes:
+          /mnt: *data2
+      throttle-check-6:
+        ship: node2
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        volumes:
+          /mnt: *data3
+      throttle-check-7:
+        ship: node3
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
+        volumes:
+          /mnt: *data1
+      throttle-check-8:
+        ship: node3
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        volumes:
+          /mnt: *data2
+      throttle-check-9:
+        ship: node3
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        volumes:
+          /mnt: *data3
+      throttle-check-10:
+        ship: node4
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
+        volumes:
+          /mnt: *data1
+      throttle-check-11:
+        ship: node4
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        volumes:
+          /mnt: *data2
+      throttle-check-12:
+        ship: node4
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        volumes:
+          /mnt: *data3
+      throttle-check-13:
+        ship: node5
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"
+        volumes:
+          /mnt: *data1
+      throttle-check-14:
+        ship: node5
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:32 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:32 31457280"
+        volumes:
+          /mnt: *data2
+      throttle-check-15:
+        ship: node5
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
+        lxc_conf:
+          lxc.cgroup.blkio.throttle.write_bps_device: "8:48 31457280"
+          lxc.cgroup.blkio.throttle.read_bps_device: "8:48 31457280"
+        volumes:
+          /mnt: *data3

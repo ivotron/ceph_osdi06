@@ -1,8 +1,40 @@
 #!/bin/bash
 #
-# executes the entire experiment. This generates the data and/or figures 5-8 of
-# OSDI paper.
+# Script to execute scalability experiment of OSDI paper (Figure 8). It 
+# optionally generates a png file out of the experiment results.
 #
+# The RUN_EXP variable determines whether to execute the experiment. The 
+# GENERATE_FIGURES variable determines whether to generate the figures from 
+# radosbench output.
+#
+# ROOT_FOLDER is the path where folders cephconf/ and results/ are placed. They 
+# should be shared among all docker hosts over NFS and be located on the same 
+# path on each host.
+#
+# Using maestro-ng and the maestro.yaml file, it deploys ceph with multiple 
+# configurations (e.g. varying the number of OSD nodes). The monitor creates or 
+# re-uses the configuration information stored in CEPHCONF. OSD nodes read the 
+# Ceph configuration from this folder.
+#
+# Variables that control the experiment:
+#
+#   * MIN_NUM_OSD - minimum number of OSD nodes to begin
+#
+#   * MAX_NUM_OSD - largest cluster size to test with
+#
+#   * PG_PER_OSD - number of placement groups per OSD node
+#
+#   * RESULTS_FOLDER - the output of radosbench is stored here, organized as:
+#
+#       $ROOT_FOLDER/$RESULTS_FOLDER/$EXP/$pgs/$num_osd/$size/$test/$rep
+#
+#     where:
+#        EXP - name of the experiment
+#        pgs - number of placement groups
+#        num_osd - number of OSD nodes used in that execution
+#        size - object size used
+#        test - write | seq | rand
+#        rep - repetition of the experiment (ranging from [1-5])
 
 YEAR=`date +%Y`
 MONTH=`date +%m`
@@ -16,13 +48,10 @@ usage()
   echo "Usage: $0: [OPTIONS]"
   echo " -e : Execute experiment ([y|n] default: y)."
   echo " -f : Generate figures ([y|n] default: y)."
-  echo " -d : Execute using default values ([y|n] default: n)."
-  echo " -c : ceph configuration path (Default: '$PWD/cephconf/')."
-  echo " -b : Space-separated list of object size in bytes ([y|n] default: 4MB)."
-  echo " -o : path to folder containing experimental results (Default: '$PWD/results/')."
-  echo " -s : Set the runtime in seconds (default: 15)."
   echo " -m : Maximum number of OSDs (default: 2)."
   echo " -n : Experiment name (default: time-based [e.g. $EXP])."
+  echo " -i : Initial number of OSDs (default: 1)."
+  echo " -p : Placement groups per OSD (default: 128)."
   echo " -h : Show this help & exit"
   echo ""
   exit 1
@@ -43,26 +72,27 @@ wait_for_radosbench ()
   echo -n "Waiting for radosbench operation to finish..."
 
   while [ "$($m status ceph-radosbench | grep 'running for' | wc -l)" -ne 0 ] ; do
-    sleep 2
+    echo $($c health) >> $f/health 
+    sleep 1
     echo -n "."
   done
   echo ""
 }
 
-while getopts ":c:d:e:f:m:n:o:s:h" OPTION
+while getopts ":e:f:h:i:m:n:p" OPTION
 do
   case ${OPTION} in
-  c)
-    CEPHCONF="${OPTARG}"
-    ;;
-  d)
-    USE_DEFAULTS="${OPTARG}"
-    ;;
   e)
     RUN_EXP="${OPTARG}"
     ;;
   f)
     GENERATE_FIGURES="${OPTARG}"
+    ;;
+  h)
+    usage
+    ;;
+  i)
+    MIN_NUM_OSD="${OPTARG}"
     ;;
   m)
     MAX_NUM_OSD="${OPTARG}"
@@ -70,62 +100,46 @@ do
   n)
     EXP="${OPTARG}"
     ;;
-  o)
-    RESULTS_PATH="${OPTARG}"
-    ;;
-  r)
-    R="${OPTARG}"
-    ;;
-  s)
-    SECS="${OPTARG}"
-    ;;
-  b)
-    SIZE="${OPTARG}"
-    ;;
-  h)
-    usage
+  p)
+    PG_PER_OSD="${OPTARG}"
     ;;
   esac
 done
 
-# we really don't need the -d flag, since the experiment can execute directly,
-# but we want to have people read the usage notes so that they know what the
-# defaults are doing
-if [ $OPTIND -eq 1 ]; then
-  usage
+####################
+# Set default values
+####################
+
+if [ ! -n "$ROOT_FOLDER" ] ; then
+  ROOT_FOLDER="$PWD"
 fi
-
-###################
-# Validate arguments
-###################
-
 if [ ! -n "$RUN_EXP" ] ; then
-  THROUGHPUT_EXP="y"
+  RUN_EXP="y"
 fi
 if [ ! -n "$GENERATE_FIGURES" ]; then
   GENERATE_FIGURES="y"
 fi
 if [ ! -n "$CEPHCONF" ]; then
-  CEPHCONF=$PWD/cephconf
+  CEPHCONF=$ROOT_FOLDER/cephconf
 fi
-if [ ! -n "$RESULTS_PATH" ]; then
-  RESULTS_PATH=$PWD/results
-fi
-if [ ! -n "$SECS" ]; then
-  SECS=15
+if [ ! -n "$RESULTS_FOLDER" ]; then
+  RESULTS_FOLDER=results
 fi
 if [ ! -n "${MAX_NUM_OSD}" ]; then
   MAX_NUM_OSD=2
 fi
-if [ ! -n "${SIZE}" ]; then
-  MAX_NUM_OSD=4194304
+if [ ! -n "${MIN_NUM_OSD}" ]; then
+  MIN_NUM_OSD=1
 fi
 if [ ! -n "$PER_ROUND_OSD_INCREMENT" ]; then
   PER_ROUND_OSD_INCREMENT=1
 fi
+if [ ! -n "$PG_PER_OSD" ]; then
+  PG_PER_OSD=128
+fi
 
 ###################
-# docker/maestro basics
+# docker basics
 ###################
 
 # check if we can execute docker
@@ -136,8 +150,21 @@ if [ $docker_exists = "not found" ]; then
   exit 1
 fi
 
+###############
+# Run experiment
+###############
+
+# Executes write benchmarks from n=1 to MAX_NUM_OSD with replication factor
+# 1 and 4m objects. This corresponds to figure 8.
+#
+# TODO: When n=THROUGHPUT_EXP_AT, object size ranges from 4k to 4m, which 
+# corresponds to the red line in figures 5,6. Read (seq) benchmarks are also 
+# executed, which are used for figure 7.
+
+if [ $RUN_EXP = "y" ] ; then
+
 # check if maestro runs OK
-m="docker run -v `pwd`:/data ivotron/maestro:0.2.3"
+m="docker run --rm=true -v `pwd`:/data ivotron/maestro-ng:0.2.4-dev"
 
 $m status
 
@@ -146,20 +173,8 @@ if [ $? != "0" ] ; then
   exit 1
 fi
 
-###############
-# Run experiment
-###############
-
-# Executes write benchmarks from n=1 to MAX_NUM_OSD with replication factor
-# 1 and 4m objects. This corresponds to figure 8.
-#
-# When n=MAX_NUM_OSD, object size ranges from 4k to 4m, which corresponds to the
-# red line in figures 5,6. Read (seq) benchmarks are also executed, which are
-# used for figure 7.
-
-if [ $RUN_EXP = "y" ] ; then
-
-c="docker run -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph"
+# alias
+c="docker run --rm=true -v $CEPHCONF:/etc/ceph ivotron/ceph-base:0.87.1 /usr/bin/ceph"
 
 # check num of MON services
 num_mon_services=`$m status ceph-mon | grep down | wc -l`
@@ -240,22 +255,15 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
     exit 1
   fi
 
-  # create pool (set PGs to 128 * OSD)
-  if [ "$curr_osd" -eq 1 ] ; then
-    $c osd pool create test 128 128
-  elif [ "$curr_osd" -eq 2 ] ; then
-    $c osd pool create test 256 256
-  elif [ "$curr_osd" -eq 3 ] ; then
-    $c osd pool create test 384 384
-  elif [ "$curr_osd" -eq 4 ] ; then
-    $c osd pool create test 512 512
-  elif [ "$curr_osd" -eq 5 ] ; then
-    $c osd pool create test 640 640
-  elif [ "$curr_osd" -eq 6 ] ; then
-    $c osd pool create test 768 768
-  else
-    $c osd pool create test 4096 4096
+  if [ "$curr_osd" -lt "$MIN_NUM_OSD" ] ; then
+    curr_osd=$(($curr_osd + 1))
+    continue
   fi
+
+  # create pool
+  pgs=$(($PG_PER_OSD * $curr_osd))
+
+  $c osd pool create test $pgs $pgs
 
   # set replication factor to 1
   $c osd pool set test size 1
@@ -263,15 +271,19 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
   # wait for it
   ceph_health
 
-  # when we reach the max num of OSDs, we execute on distinct sizes
-  if [ $curr_osd -eq $MAX_NUM_OSD ] ; then
-    SIZE="4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304"
-  fi
+  sleep 10
 
+  rep=1
+  while [ $rep -le 3 ] ; do
   for size in $SIZE; do
 
-    f="$RESULTS_PATH/$EXP/$curr_osd/$size/write/"
+    f="$ROOT_FOLDER/$RESULTS_FOLDER/$EXP/$pgs/$curr_osd/$size/write/$rep"
     mkdir -p $f
+
+    SECS=60
+    SIZE=4194304
+    EXP_TYPE="write"
+    THREADS=16
 
     $m start ceph-radosbench
 
@@ -280,7 +292,22 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
       exit 1
     fi
 
+    echo "" > $f/health
+
     wait_for_radosbench
+
+    ceph_health
+
+    # check if cluster misbehaved
+    num_warns=`grep "HEALTH_WARN" $f/health | wc -l`
+
+    # get to next repetition iff there were no warnings
+    if [ $num_warns -eq 0 ] ; then
+      rep=$(($rep + 1))
+      rm $f/health
+    fi
+
+  done
   done
 
   curr_osd=$(($curr_osd + $PER_ROUND_OSD_INCREMENT))
@@ -302,55 +329,49 @@ fi # RUN_EXP
 
 if [ "$GENERATE_FIGURES" = "y" ] ; then
   # generates CSV files that summarize radosbench output (one CSV per figure)
-
-  if [ ! -n "$RESULTS_PATH" ]; then
-    echo "ERROR: RESULTS_PATH must be defined"
-    exit 1
-  fi
-
-  if [ ! -n "$EXP" ]; then
-    echo "ERROR: EXPERIMENT must be defined"
-    exit 1
-  fi
-
-  throughput=${RESULTS_PATH}/${EXP}_per-osd-write-throughput.csv
-  latency=${RESULTS_PATH}/${EXP}_per-osd-write-latency.csv
-  rw=${RESULTS_PATH}/${EXP}_per-osd-rw-throughput.csv
-  scale=${RESULTS_PATH}/${EXP}_per-osd-scalable-throughput.csv
-  expath=$RESULTS_PATH/$EXP
+  expath=$RESULTS_FOLDER/$EXP
+  throughput=${expath}_per-osd-write-throughput.csv
+  latency=${expath}_per-osd-write-latency.csv
+  rw=${expath}_per-osd-rw-throughput.csv
+  scale=${expath}_per-osd-scalable-throughput.csv
 
   # create files
-  echo "" > $throughput # figure 5
-  echo "" > $latency    # figure 6
-  echo "" > $scale      # figure 8
+  echo "num_osd, size, repetition, throughput_avg, throughput_std" > $throughput
+  echo "num_osd, size, repetition, latency_avg, latency_std" > $latency
+  echo "num_osd, size, repetition, throughput_avg, throughput_std" > $scale
 
   # populate them
-  for osd in `ls $expath` ; do
-  for size in `ls $expath/$osd` ; do
-  for bench in `ls $expath/$osd/$size` ; do
-  for client in `ls $expath/$osd/$size/$bench` ; do
-    f="$expath/$osd/$size/$bench/$client"
+  for pg in `ls $ROOT_FOLDER/$expath` ; do
+  for osd in `ls $ROOT_FOLDER/$expath/$pg/` ; do
+  for size in `ls $ROOT_FOLDER/$expath/$pg/$osd` ; do
+  for bench in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size` ; do
+  for rep in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size/$bench` ; do
+    f="$ROOT_FOLDER/$expath/$pg/$osd/$size/$bench/$rep"
 
     if [ $bench = "write" ] ; then
-      tp=`grep 'Bandwidth (MB/sec):' $f | sed 's/Bandwidth (MB\/sec): *//'`
-      lt=`grep 'Average Latency:' $f | sed 's/Average Latency: *//'`
-      echo "$size, $tp" >> $throughput
-      echo "$size, $lt" >> $latency
-      echo "$size, $osd, $tp" >> $scale
+      tp_std=`grep 'Stddev Bandwidth:' $f/out | sed 's/Stddev Bandwidth: *//'`
+      lt_std=`grep 'Stddev Latency:' $f/out | sed 's/Stddev Latency: *//'`
+      tp_avg=`grep 'Bandwidth (MB/sec):' $f/out | sed 's/Bandwidth (MB\/sec): *//'`
+      lt_avg=`grep 'Average Latency:' $f/out | sed 's/Average Latency: *//'`
     fi
+
+    echo "$pg,$osd,$size,$rep,$tp_avg,$tp_std" >> $throughput
+    echo "$pg,$osd,$size,$rep,$lt_avg,$lt_std" >> $latency
+    echo "$pg,$osd,$size,$rep,$tp_avg,$tp_std" >> $scale
+  done
   done
   done
   done
   done
 
   # generate the figures (png files)
+
+  # figure 8
   docker run \
-      -v $RESULTS_PATH:/results \
-      -v $PWD:/script \
-      ivotron/gnuplot:4.6.4 -e "maxosd=$MAX_NUM_OSD" \
-                      -e "folder='/results'" \
-                      -e "experiment='$EXP'" \
-                      /script/plot.gp
-fi
+      --rm=true \
+      -v $ROOT_FOLDER:/mnt \
+      ivotron/r-with-pkgs:3.1.2 /usr/bin/Rscript /mnt/plot.R /mnt/$scale
+
+fi # GENERATE_FIGURES
 
 exit 0
