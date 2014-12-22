@@ -1,5 +1,4 @@
-High-level log below contains coarse granularity description of 
-milestiones. Fine-grained is in github repo.
+
 
 In general, experimental setup is composed of 4 layers: (1) hardware, 
 (2) system, (3) processes and (4) workload. In the current setup, 1/2 
@@ -21,10 +20,10 @@ purpose of reflecting in code what we're doing manually.
 
 Tracked via submodules:
 
-  * docker-maestro
+  * docker-maestro-ng
   * docker-ceph
   * docker-radosbench
-  * docker-gnuplot
+  * docker-r
 
 Not tracked:
 
@@ -32,19 +31,66 @@ Not tracked:
   * Address space: 192.168.141.0/24
   * Ephemeral storage
   * HDDs on sdb-sdd
-  * SSD on sde
   * Ubuntu 12.04.3 (docker hosts)
-  * Linux 3.8.0-44-generic x86_64
+  * Linux 3.13.0-43-generic x86_64
   * docker:
-      * Client version: 1.3.1
-      * Client API version: 1.15
-      * Go version (client): go1.3.3
-      * Git commit (client): 4e9bbfa
-      * OS/Arch (client): linux/amd64
-      * docker hosts listening over TPC on 2375 (default) port
-  * NFS folder cephconf shared with all container hosts
+
+        Client version: 1.3.3
+        Client API version: 1.15
+        Go version (client): go1.3.3
+        Git commit (client): d344625
+        OS/Arch (client): linux/amd64
+        Server version: 1.3.3
+        Server API version: 1.15
+        Go version (server): go1.3.3
+        Git commit (server): d344625
+
+  * NFS folders `$PWD/cephconf` and `$PWD/results` shared with all 
+    container hosts
 
 # High-level lab log
+
+## 2014-12-12
+
+Removed read test and left only the scalability experiments (4mb that 
+range from 1-n, where n is the maximum number of OSD nodes to test 
+against), to simplify. The experiments on section 6.1 of the paper 
+show the ability of Ceph to balance the load of the cluster by 
+illustrating how disks are pushed to their limits, up to the point 
+where the network becomes the bottleneck.
+
+We initially experienced a lot of variance in our results due to the 
+fact that disks in our testbed vary in their performance from 30-90 
+mb/s. CRUSH has the ability to weight distinct devices but we're not 
+tuning the CRUSH map (every device has the same weight). As an 
+alternative, we're throttling IO in order to have a uniform, 
+controlled setting.
+
+We reduce the experiment from 20 client nodes to 1. This client is 
+connected to the switch on a 1 Gb link. Thus the experiment is limited 
+to execute at ~ 110 MB/s.
+
+Since disks are throttled to 30MB/s and we collocate the write-ahead 
+log and data on the same device, the throughput is approximately 10-15 
+MB/s per node.
+
+## 2014-12-03
+
+Noticed many OSD failures are experienced throughout the experiment. 
+Ceph considers an OSD as failed when it timouts on an operation. This 
+hardware is almost 10 years old, so it might be the result of old 
+disks.
+
+While Ceph is able to heal itself, the results get screwed up if some 
+OSDs go down while an experiment runs. So I have to keep a thread that 
+periodically checks the health of the cluster and record that. If 
+during an experiment there are failures, then I re-execute until I get 
+failure-free results. Something I noticed is that, when I don't 
+throttle I/O (see entry above) the failure-rate increases. I think 
+this might be due to the fact that the hard disks are pushed to their 
+limits and this might trigger failures (Ceph considers an OSD down 
+when it times out on a I/O request, with 30 seconds being the 
+default).
 
 ## 2014-11-27
 
