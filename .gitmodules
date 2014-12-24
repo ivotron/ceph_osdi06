@@ -1,12 +1,12 @@
 [submodule "docker-ceph"]
-	path = docker-ceph
+	path = 05/docker-ceph
 	url = git@github.com:ivotron/docker-ceph.git
 [submodule "docker-maestro"]
-	path = docker-maestro
+	path = 05/docker-maestro
 	url = git@github.com:ivotron/docker-maestro.git
 [submodule "docker-gnuplot"]
-	path = docker-gnuplot
+	path = 05/docker-gnuplot
 	url = git@github.com:ivotron/docker-gnuplot.git
 [submodule "docker-radosbench"]
-	path = docker-radosbench
+	path = 05/docker-radosbench
 	url = git@github.com:ivotron/docker-radosbench.git
