@@ -351,8 +351,8 @@ if [ "$GENERATE_FIGURES" = "y" ] ; then
   scale=${expath}_per-osd-scalable-throughput.csv
 
   # create files
-  echo "pgs, num_osd, size, repetition, throughput_avg, throughput_std" > $throughput
-  echo "pgs, num_osd, size, repetition, latency_avg, latency_std" > $latency
+  #echo "pgs, num_osd, size, repetition, throughput_avg, throughput_std" > $throughput
+  #echo "pgs, num_osd, size, repetition, latency_avg, latency_std" > $latency
   echo "pgs, num_osd, size, repetition, throughput_avg, throughput_std" > $scale
 
   # populate them
@@ -372,8 +372,8 @@ if [ "$GENERATE_FIGURES" = "y" ] ; then
       lt_avg=`grep 'Average Latency:' $f/out | sed 's/Average Latency: *//'`
     fi
 
-    echo "$pg,$osd,$size,$rep,$tp_avg,$tp_std" >> $throughput
-    echo "$pg,$osd,$size,$rep,$lt_avg,$lt_std" >> $latency
+    #echo "$pg,$osd,$size,$rep,$tp_avg,$tp_std" >> $throughput
+    #echo "$pg,$osd,$size,$rep,$lt_avg,$lt_std" >> $latency
     echo "$pg,$osd,$size,$rep,$tp_avg,$tp_std" >> $scale
   done
   done
