@@ -5,6 +5,7 @@ _globals_defaults:
   V4: &benchtype {{ env.EXP_TYPE }}
   V5: &size {{ env.SIZE }}
   V6: &threads {{ env.THREADS }}
+  V7: &expname {{ env.EXP }} }}
 
 name: ceph_osdi06
 
@@ -343,7 +344,7 @@ services:
         ship: node1
         env:
           SIZE: {{ env.SIZE }}
-        command: /bin/sh -c "echo $SIZE"
+        command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
         lxc_conf:
           lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
           lxc.cgroup.blkio.throttle.read_bps_device: "8:16 31457280"

@@ -71,12 +71,17 @@ wait_for_radosbench ()
 {
   echo -n "Waiting for radosbench operation to finish..."
 
-  while [ "$($m status ceph-radosbench | grep 'running for' | wc -l)" -ne 0 ] ; do
+  while [ "$($m status ceph-radosbench | grep 'running' | wc -l)" -ne 0 ] ; do
     echo $($c health) >> $f/health 
     sleep 1
     echo -n "."
   done
   echo ""
+}
+
+ms ()
+{
+  echo "docker run --env CEPHCONF=$CEPHCONF --env RESULTS_FOLDER=$f --env EXP=$EXP --env SECS=$SECS --env SIZE=$SIZE --env EXP_TYPE=$EXP_TYPE --env THREADS=$THREADS --entrypoint=maestro --rm=true -v `pwd`:/data ivotron/maestro-ng:0.2.4-dev"
 }
 
 while getopts ":e:f:h:i:m:n:p" OPTION
@@ -164,12 +169,16 @@ fi
 if [ $RUN_EXP = "y" ] ; then
 
 # check if maestro runs OK
-m="docker run --rm=true -v `pwd`:/data ivotron/maestro-ng:0.2.4-dev"
-
-$m status
+m=`ms`
+any_output=`$m status | wc -l`
 
 if [ $? != "0" ] ; then
-  echo "ERROR: can't execute maestro container"
+  echo "ERROR: maestro exited with non-zero code"
+  exit 1
+fi
+
+if [ $any_output -eq 0 ] ; then
+  echo "ERROR: seems that maestro isn't generating output"
   exit 1
 fi
 
@@ -206,6 +215,7 @@ if [ $hosts_down != "0" ] ; then
 fi
 
 # start monitor
+m=`ms`
 $m start ceph-mon
 
 if [ $? != "0" ] ; then
@@ -213,7 +223,7 @@ if [ $? != "0" ] ; then
   exit 1
 fi
 
-mons_up=`$m status ceph-mon | grep 'running for' | wc -l`
+mons_up=`$m status ceph-mon | grep 'running' | wc -l`
 
 if [ "$mons_up" -ne 1 ] ; then
   echo "ERROR: Expecting 1 monitor up, but only $mons_up are up"
@@ -241,6 +251,7 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
     exit 1
   fi
 
+  m=`ms`
   $m start ceph-osd-$curr_osd
 
   if [ $? != "0" ] ; then
@@ -248,7 +259,7 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
     exit 1
   fi
 
-  osd_up=`$m status ceph-osd-$curr_osd | grep 'running for' | wc -l`
+  osd_up=`$m status ceph-osd-$curr_osd | grep 'running' | wc -l`
 
   if [ $osd_up != "1" ] ; then
     echo "ERROR: OSD service ceph-osd-$curr_osd seems to have stopped"
@@ -271,13 +282,10 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
   # wait for it
   ceph_health
 
-  sleep 10
-
   rep=1
   while [ $rep -le 3 ] ; do
-  for size in $SIZE; do
 
-    f="$ROOT_FOLDER/$RESULTS_FOLDER/$EXP/$pgs/$curr_osd/$size/write/$rep"
+    f="$ROOT_FOLDER/$RESULTS_FOLDER/$EXP/$PG_PER_OSD/$curr_osd/$size/write/$rep"
     mkdir -p $f
 
     SECS=60
@@ -285,10 +293,18 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
     EXP_TYPE="write"
     THREADS=16
 
+    m=`ms`
     $m start ceph-radosbench
 
     if [ $? != "0" ] ; then
       echo "ERROR: can't initialize radosbench services"
+      exit 1
+    fi
+
+    rb_up=`$m status ceph-radosbench | grep 'running' | wc -l`
+
+    if [ $rb_up != "1" ] ; then
+      echo "ERROR: ceph-radosench seems to have stopped"
       exit 1
     fi
 
@@ -307,12 +323,11 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
       rm $f/health
     fi
 
-  done
-  done
+  done # while rep
 
   curr_osd=$(($curr_osd + $PER_ROUND_OSD_INCREMENT))
 
-done # while
+done # while curr_osd
 
 # stop cluster
 $m stop
@@ -336,17 +351,19 @@ if [ "$GENERATE_FIGURES" = "y" ] ; then
   scale=${expath}_per-osd-scalable-throughput.csv
 
   # create files
-  echo "num_osd, size, repetition, throughput_avg, throughput_std" > $throughput
-  echo "num_osd, size, repetition, latency_avg, latency_std" > $latency
-  echo "num_osd, size, repetition, throughput_avg, throughput_std" > $scale
+  echo "pgs, num_osd, size, repetition, throughput_avg, throughput_std" > $throughput
+  echo "pgs, num_osd, size, repetition, latency_avg, latency_std" > $latency
+  echo "pgs, num_osd, size, repetition, throughput_avg, throughput_std" > $scale
 
   # populate them
   for pg in `ls $ROOT_FOLDER/$expath` ; do
   for osd in `ls $ROOT_FOLDER/$expath/$pg/` ; do
   for size in `ls $ROOT_FOLDER/$expath/$pg/$osd` ; do
-  for bench in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size` ; do
-  for rep in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size/$bench` ; do
-    f="$ROOT_FOLDER/$expath/$pg/$osd/$size/$bench/$rep"
+  for bench in `ls $ROOT_FOLDER/$expath/$pg/$osd/` ; do
+  for rep in `ls $ROOT_FOLDER/$expath/$pg/$osd/$bench` ; do
+    f="$ROOT_FOLDER/$expath/$pg/$osd/$bench/$rep"
+
+    echo "checking file $f/out"
 
     if [ $bench = "write" ] ; then
       tp_std=`grep 'Stddev Bandwidth:' $f/out | sed 's/Stddev Bandwidth: *//'`
@@ -369,8 +386,9 @@ if [ "$GENERATE_FIGURES" = "y" ] ; then
   # figure 8
   docker run \
       --rm=true \
+      -v $ROOT_FOLDER/plot.R:/root/plot.R \
       -v $ROOT_FOLDER:/mnt \
-      ivotron/r-with-pkgs:3.1.2 /usr/bin/Rscript /mnt/plot.R /mnt/$scale
+      ivotron/r-with-pkgs:3.1.2 /usr/bin/Rscript /root/plot.R /mnt/$scale 60
 
 fi # GENERATE_FIGURES
 
