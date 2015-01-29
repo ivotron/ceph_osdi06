@@ -5,17 +5,17 @@ _globals_defaults:
   V4: &benchtype {{ env.EXP_TYPE }}
   V5: &size {{ env.SIZE }}
   V6: &threads {{ env.THREADS }}
-  V7: &expname {{ env.EXP }} }}
+  V7: &expname {{ env.EXP }}
 
 name: ceph_osdi06
 
 ships:
   node0: {ip: &n0ip 192.168.141.101}
   node1: {ip: 192.168.141.107}
-  node2: {ip: 192.168.141.132}
-  node3: {ip: 192.168.141.108}
-  node4: {ip: 192.168.141.147}
-  node5: {ip: 192.168.141.118}
+  node2: {ip: 192.168.141.108}
+  node3: {ip: 192.168.141.118}
+  node4: {ip: 192.168.141.132}
+  node5: {ip: 192.168.141.147}
   node6: {ip: 192.168.141.129}
 
 ship_defaults:
@@ -342,8 +342,6 @@ services:
     instances:
       throttle-check-1:
         ship: node1
-        env:
-          SIZE: {{ env.SIZE }}
         command: /bin/sh -c "dd if=/dev/zero of=/mnt/here bs=4M count=250 oflag=direct"
         lxc_conf:
           lxc.cgroup.blkio.throttle.write_bps_device: "8:16 31457280"
