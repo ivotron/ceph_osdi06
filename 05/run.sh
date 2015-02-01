@@ -47,11 +47,13 @@ usage()
   echo ""
   echo "Usage: $0: [OPTIONS]"
   echo " -e : Execute experiment ([y|n] default: y)."
+  echo " -d : Execute data performance experiment too (default: n)."
   echo " -f : Generate figures ([y|n] default: y)."
   echo " -m : Maximum number of OSDs (default: 2)."
   echo " -n : Experiment name (default: time-based [e.g. $EXP])."
   echo " -i : Initial number of OSDs (default: 1)."
   echo " -p : Placement groups per OSD (default: 128)."
+  echo " -r : Number of repetitions of an experiment (default: 2)."
   echo " -h : Show this help & exit"
   echo ""
   exit 1
@@ -84,11 +86,14 @@ ms ()
   echo "docker run --env CEPHCONF=$CEPHCONF --env RESULTS_FOLDER=$f --env EXP=$EXP --env SECS=$SECS --env SIZE=$SIZE --env EXP_TYPE=$EXP_TYPE --env THREADS=$THREADS --entrypoint=maestro --rm=true -v `pwd`:/data ivotron/maestro-ng:0.2.4-dev"
 }
 
-while getopts ":e:f:h:i:m:n:p" OPTION
+while getopts ":e:d:f:h:i:m:n:p:r" OPTION
 do
   case ${OPTION} in
   e)
     RUN_EXP="${OPTARG}"
+    ;;
+  d)
+    RUN_DATAPERF_EXP="${OPTARG}"
     ;;
   f)
     GENERATE_FIGURES="${OPTARG}"
@@ -108,6 +113,9 @@ do
   p)
     PG_PER_OSD="${OPTARG}"
     ;;
+  r)
+    NUM_REPS="${OPTARG}"
+    ;;
   esac
 done
 
@@ -120,6 +128,9 @@ if [ ! -n "$ROOT_FOLDER" ] ; then
 fi
 if [ ! -n "$RUN_EXP" ] ; then
   RUN_EXP="y"
+fi
+if [ ! -n "$RUN_DATAPERF_EXP" ] ; then
+  RUN_DATAPERF_EXP="n"
 fi
 if [ ! -n "$GENERATE_FIGURES" ]; then
   GENERATE_FIGURES="y"
@@ -141,6 +152,9 @@ if [ ! -n "$PER_ROUND_OSD_INCREMENT" ]; then
 fi
 if [ ! -n "$PG_PER_OSD" ]; then
   PG_PER_OSD=128
+fi
+if [ ! -n "$NUM_REPS" ]; then
+  NUM_REPS=2
 fi
 
 ###################
@@ -266,6 +280,8 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
     exit 1
   fi
 
+  echo " having $curr_osd  vs $MIN_NUM_OSD"
+
   if [ "$curr_osd" -lt "$MIN_NUM_OSD" ] ; then
     curr_osd=$(($curr_osd + 1))
     continue
@@ -282,14 +298,24 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
   # wait for it
   ceph_health
 
+  SIZES="4194304"
+
+  if [ $curr_osd -eq $MAX_NUM_OSD ] && [ $RUN_DATAPERF_EXP = "y" ] ; then
+    SIZES="4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304"
+  fi
+
+  for size in $SIZES ; do
+
+  echo "doing object size $size"
+
   rep=1
-  while [ $rep -le 3 ] ; do
+  while [ $rep -le $NUM_REPS ] ; do
 
     f="$ROOT_FOLDER/$RESULTS_FOLDER/$EXP/$PG_PER_OSD/$curr_osd/$size/write/$rep"
     mkdir -p $f
 
     SECS=60
-    SIZE=4194304
+    SIZE=$size
     EXP_TYPE="write"
     THREADS=16
 
@@ -325,6 +351,8 @@ while [ "$curr_osd" -le "$MAX_NUM_OSD" ] ; do
 
   done # while rep
 
+  done # for size
+
   curr_osd=$(($curr_osd + $PER_ROUND_OSD_INCREMENT))
 
 done # while curr_osd
@@ -359,9 +387,9 @@ if [ "$GENERATE_FIGURES" = "y" ] ; then
   for pg in `ls $ROOT_FOLDER/$expath` ; do
   for osd in `ls $ROOT_FOLDER/$expath/$pg/` ; do
   for size in `ls $ROOT_FOLDER/$expath/$pg/$osd` ; do
-  for bench in `ls $ROOT_FOLDER/$expath/$pg/$osd/` ; do
-  for rep in `ls $ROOT_FOLDER/$expath/$pg/$osd/$bench` ; do
-    f="$ROOT_FOLDER/$expath/$pg/$osd/$bench/$rep"
+  for bench in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size` ; do
+  for rep in `ls $ROOT_FOLDER/$expath/$pg/$osd/$size/$bench` ; do
+    f="$ROOT_FOLDER/$expath/$pg/$osd/$size/$bench/$rep"
 
     echo "checking file $f/out"
 
