@@ -1,9 +1,9 @@
 [submodule "docker-ceph"]
 	path = 05/docker-ceph
-	url = git@github.com:ivotron/docker-ceph.git
+	url = https://github.com/ivotron/docker-ceph.git
 [submodule "docker-maestro"]
 	path = 05/docker-maestro
-	url = git@github.com:ivotron/docker-maestro.git
+	url = https://github.com/ivotron/docker-maestro.git
 [submodule "docker-radosbench"]
 	path = 05/docker-radosbench
-	url = git@github.com:ivotron/docker-radosbench.git
+	url = https://github.com/ivotron/docker-radosbench.git
