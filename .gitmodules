@@ -1,9 +1,7 @@
-[submodule "docker-ceph"]
-	path = 05/docker-ceph
-	url = https://github.com/ivotron/docker-ceph.git
-[submodule "docker-maestro"]
-	path = 05/docker-maestro
-	url = https://github.com/ivotron/docker-maestro.git
-[submodule "docker-radosbench"]
-	path = 05/docker-radosbench
-	url = https://github.com/ivotron/docker-radosbench.git
+[submodule "vendor/teuthology"]
+	path = vendor/teuthology
+	url = https://github.com/ivotron/teuthology
+	branch = wip-11892-docker
+[submodule "vendor/ceph-qa-suite"]
+	path = vendor/ceph-qa-suite
+	url = https://github.com/ceph/ceph-qa-suite

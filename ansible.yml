@@ -1,0 +1,11 @@
+- name: "prepare disks for scalability experiments"
+  hosts: all
+  tasks:
+  - name: "create ext4 partitions on sdb1 servers; assuming they exist"
+    filesystem: fstype=ext4 dev=/dev/sdb1 force=true
+  - name: "create cgroup for ceph OSDs"
+    command: mkdir /sys/fs/cgroup/blkio/ceph
+  - name: "add blkio constraint"
+    shell: echo "8:16 20000000" > /sys/fs/cgroup/blkio/ceph/blkio.throttle.write_bps_device
+  - name: "mount /var/lib/ceph"
+    mount: name=/var/lib/ceph src=/dev/sdb1 state=mounted fstype=ext4

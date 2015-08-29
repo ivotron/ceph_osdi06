@@ -1,0 +1,29 @@
+check-locks: false
+sshkeys: ignore
+ssh_port: 2222
+roles:
+- [mon.0, osd.0]
+- [osd.1]
+- [osd.2]
+- [osd.3]
+- [osd.4]
+- [osd.5]
+- [osd.6]
+- [client.1]
+- [client.2]
+- [client.3]
+- [client.4]
+tasks:
+- ceph:
+- radosbenchsweep:
+    clients: [client.0]
+    min_replicas: 1
+    max_replicas: 2
+    min_num_osd: 1
+    max_num_osd: 9
+- aver:
+    input: "radosbench.csv"
+    validations:
+    - "expect avg_throughput > 0"
+# targets:
+#    this is added by the launch_remotes.py script
