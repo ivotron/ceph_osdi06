@@ -1,0 +1,89 @@
+- name: "Scalability experiment setup"
+  hosts: all
+  vars:
+    sshkey: "{{ lookup('file', keyfile) }}"
+  pre_tasks:
+  - name: "Check if vivid kernel is installed"
+    command: dpkg-query -l linux-generic-lts-vivid
+    register: deb_check
+    failed_when: false
+    when:
+      - ansible_distribution_release == 'trusty'
+      - install_docker
+  - name: "Upgrade kernel to Vivid's"
+    apt: name=linux-generic-lts-vivid update_cache=yes
+    when:
+      - ansible_distribution_release == 'trusty'
+      - install_docker
+      - deb_check.stdout.find('no packages found') != -1
+  - name: "Restart machine"
+    command: shutdown -r now "Ansible updates triggered"
+    when:
+      - ansible_distribution_release == 'trusty'
+      - install_docker
+      - deb_check.stdout.find('no packages found') != -1
+    async: 0
+    poll: 0
+    ignore_errors: true
+  - name: "Waiting for server to come back"
+    local_action: wait_for host={{ inventory_hostname }}
+                  state=started
+    when:
+      - ansible_distribution_release == 'trusty'
+      - install_docker
+      - deb_check.stdout.find('no packages found') != -1
+    sudo: false
+  roles:
+  - role: docker.ubuntu
+    docker_opts: "--host tcp://0.0.0.0:2375"
+    docker_group_members: [ "{{ ansible_ssh_user }}" ]
+    when: install_docker
+  post_tasks:
+  - name: "Get disks list"
+    set_fact: disk_var="{{hostvars[inventory_hostname]["ansible_devices"].keys()|list}}"
+    when: format_disk
+  - name: "Check if the disk is partitioned and also ignore every device but sdb"
+    stat: path=/dev/{{item}}1
+    with_items: disk_var
+    when:
+    - format_disk
+    - item == 'sdb'
+    register: device_stat
+  - name: "Create GPT partition table"
+    command: /sbin/parted -s /dev/{{ item.item }} mklabel gpt
+    with_items: device_stat.results
+    when:
+    - format_disk
+    - not item | skipped
+    - item.stat.exists == false
+  - name: "Create one partition"
+    command: /sbin/parted -s /dev/{{ item.item }} -- mkpart primary 1MiB -1
+    with_items: device_stat.results
+    when:
+    - format_disk
+    - not item | skipped
+    - item.stat.exists == false
+  - name: "Create ext4 filesystem on /dev/sdb1"
+    filesystem: fstype=ext4 dev=/dev/sdb1 force=true
+    when: format_disk
+  - name: "Mount /mnt/vol1 on /dev/sdb1"
+    mount: name=/mnt/vol1 src=/dev/sdb1 state=mounted fstype=ext4
+    when: mount_disk
+  - name: "Clean ceph data"
+    file: path=/mnt/vol1/ceph_data state=absent
+  - name: "Create ceph data folder"
+    file: path=/mnt/vol1/ceph_data state=directory mode=0755
+  - name: "Create cgroup for ceph OSDs"
+    file: path=/sys/fs/cgroup/blkio/ceph state=directory mode=0755
+  - name: "Add blkio constraint on /dev/sdb"
+    shell: echo "8:16 {{ disk_bw }}000000" > /sys/fs/cgroup/blkio/ceph/blkio.throttle.write_bps_device
+  - name: "pull image for running teuthology in a container"
+    command: docker -H tcp://0.0.0.0:2375 pull ivotron/cephdev
+  - name: "stop any existing teuthology remote"
+    command: docker -H tcp://0.0.0.0:2375 stop teuthology_remote_{{ ansible_hostname }}
+    ignore_errors: yes
+  - name: "remove any existing teuthology remote"
+    command: docker -H tcp://0.0.0.0:2375 rm teuthology_remote_{{ ansible_hostname }}
+    ignore_errors: yes
+  - name: "launch teuthology remotes"
+    command: docker -H tcp://0.0.0.0:2375 run -d --name teuthology_remote_{{ ansible_hostname }} --net=host -e SSHD_PORT=2222 -e AUTHORIZED_KEYS="{{ sshkey }}" -v /dev:/dev -v /mnt/vol1/ceph_data:/var/lib/ceph --cap-add=SYS_ADMIN --privileged --device /dev/fuse --cgroup-parent=ceph ivotron/cephdev-prebuilt:hammer

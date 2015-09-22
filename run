@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+import argparse
+from subprocess import check_call
+
+parser = argparse.ArgumentParser(description='Run scalability test')
+parser.add_argument(
+    '-k', '--keyfile', help='SSH key file', required=True)
+parser.add_argument(
+    '-o', '--output', help='Output folder with results', required=True)
+parser.add_argument(
+    '-b', help='Passed to ansible', dest='become', action='store_true')
+parser.add_argument(
+    '-d', help='Whether to install docker (default: false)',
+    dest='install_docker', action='store_true')
+parser.add_argument(
+    '-c',
+    help=('Whether to clean ceph data. Useful for when disk has been prepared'
+          ' and there is no need to format it again (default: true)'),
+    dest='clean_data', action='store_true')
+parser.add_argument(
+    '-f', help='Whether to format the disk (default: false)',
+    dest='format_disk', action='store_true')
+parser.add_argument(
+    '-m', help='Whether to mount the disk (default: false)',
+    dest='mount_disk', action='store_true')
+parser.add_argument(
+    '-s', help='Skip experiment setup (default: false)', dest='skip_setup',
+    action='store_true')
+parser.add_argument(
+    '-u', '--user', help='Passed to ansible', required=True)
+parser.set_defaults(become=False)
+parser.set_defaults(install_docker=False)
+parser.set_defaults(format_disk=False)
+parser.set_defaults(mount_disk=False)
+parser.set_defaults(skip_setup=False)
+args = vars(parser.parse_args())
+user = args['user']
+
+if not args['skip_setup']:
+    # invoke ansible-playbook
+    check_call(
+        ("ansible-playbook {u} {b} "
+         "-i nodes "
+         "-e keyfile='{k}' "
+         "-e install_docker={d} "
+         "-e format_disk={f} "
+         "-e mount_disk={m} "
+         "-e disk_bw=40 "
+         "experiment-setup.yml").format(
+             u='-u ' + user,
+             b='-b' if args['become'] else '',
+             k=args['keyfile'],
+             d=str(args['install_docker']),
+             f=str(args['format_disk']),
+             m=str(args['mount_disk']),
+        ),
+        shell=True)
+
+# create teuthology_job.yml with targets from 'nodes' file
+check_call("cp teuthology_job.yml.in teuthology_job.yml", shell=True)
+with open('teuthology_job.yml', 'a') as yml:
+    with open('nodes', 'r') as nodes_file:
+        nodes = nodes_file.readlines()
+        yml.write("targets:\n")
+        for n in nodes:
+            if '#' in n or '[' in n:
+                continue
+            yml.write(
+                "  'root@" + n.strip(' \t\n\r') + ":2222': ssh-dss ignore\n")
+
+# execute teuthology
+check_call(
+    ("docker run "
+     "  -v `pwd`/vendor/ceph-qa-suite:/tmp/suite "
+     "  -v `pwd`/teuthology_job.yml:/tmp/test.yml "
+     "  -v `pwd`/.teuthology.yaml:/root/.teuthology.yaml "
+     "  -v $HOME/.ssh/:/root/.ssh/ "
+     "  -v {}:/archive "
+     "  --net=host "
+     "  --rm "
+     "  ivotron/teuthology:wip-docker teuthology"
+     "    --archive /archive/`date +%s` "
+     "    --suite-path /tmp/suite "
+     "    /tmp/test.yml ").format(args['output']),
+    shell=True)
+
+check_call("rm teuthology_job.yml", shell=True)
+
+# cleanup containers
+check_call(
+    ("ansible all {u} {b} "
+     "-i nodes "
+     "-a 'docker stop teuthology_remote_{{ ansible_hostname }}'").format(
+         u='-u ' + args['user'],
+         b='-b' if args['become'] else '',
+    ),
+    shell=True)
+check_call(
+    ("ansible all {u} {b} "
+     "-i nodes "
+     "-a 'docker rm teuthology_remote_{{ ansible_hostname }}'").format(
+         u='-u ' + args['user'],
+         b='-b' if args['become'] else '',
+    ),
+    shell=True)

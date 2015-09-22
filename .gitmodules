@@ -5,3 +5,6 @@
 [submodule "vendor/ceph-qa-suite"]
 	path = vendor/ceph-qa-suite
 	url = https://github.com/ceph/ceph-qa-suite
+[submodule "vendor/docker.ubuntu"]
+	path = vendor/docker.ubuntu
+	url = https://github.com/angstwad/docker.ubuntu
