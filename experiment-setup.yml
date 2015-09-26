@@ -3,36 +3,25 @@
   vars:
     sshkey: "{{ lookup('file', keyfile) }}"
   pre_tasks:
-  - name: "Check if vivid kernel is installed"
-    command: dpkg-query -l linux-generic-lts-vivid
-    register: deb_check
-    failed_when: false
-    when:
-      - ansible_distribution_release == 'trusty'
-      - install_docker
   - name: "Upgrade kernel to Vivid's"
     apt: name=linux-generic-lts-vivid update_cache=yes
     when:
-      - ansible_distribution_release == 'trusty'
-      - install_docker
-      - deb_check.stdout.find('no packages found') != -1
+    - install_docker
+    - "ansible_distribution_version|version_compare(14.04, '=')"
   - name: "Restart machine"
     command: shutdown -r now "Ansible updates triggered"
-    when:
-      - ansible_distribution_release == 'trusty'
-      - install_docker
-      - deb_check.stdout.find('no packages found') != -1
     async: 0
     poll: 0
     ignore_errors: true
+    when:
+    - install_docker
+    - "ansible_distribution_version|version_compare(14.04, '=')"
   - name: "Waiting for server to come back"
     local_action: wait_for host={{ inventory_hostname }}
                   state=started
-    when:
-      - ansible_distribution_release == 'trusty'
-      - install_docker
-      - deb_check.stdout.find('no packages found') != -1
     sudo: false
+    when:
+    - install_docker
   roles:
   - role: docker.ubuntu
     docker_opts: "--host tcp://0.0.0.0:2375"
@@ -78,7 +67,9 @@
   - name: "Add blkio constraint on /dev/sdb"
     shell: echo "8:16 {{ disk_bw }}000000" > /sys/fs/cgroup/blkio/ceph/blkio.throttle.write_bps_device
   - name: "pull image for running teuthology in a container"
-    command: docker -H tcp://0.0.0.0:2375 pull ivotron/cephdev
+    command: docker -H tcp://0.0.0.0:2375 pull ivotron/cephdev-prebuilt:hammer
+    async: 180
+    poll: 30
   - name: "stop any existing teuthology remote"
     command: docker -H tcp://0.0.0.0:2375 stop teuthology_remote_{{ ansible_hostname }}
     ignore_errors: yes
