@@ -4,20 +4,20 @@ roles:
 - [osd.1]
 - [osd.2]
 - [osd.3]
-- [osd.4]
 - [client.0]
 - [client.1]
 - [client.2]
+- [client.3]
 tasks:
 - install.ship_utilities:
 - ceph:
 - radosbenchsweep:
-    clients: [client.0, client.1, client.2]
+    clients: [client.0, client.1, client.2, client.3]
     time: 180
     min_num_replicas: 1
     max_num_replicas: 1
     min_num_osds: 1
-    max_num_osds: 5
+    max_num_osds: 4
 - aver:
     input: "radosbench.csv"
     validations:
